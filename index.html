@@ -5,95 +5,65 @@
 <title>SchemaScript Visual Playground</title>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
-  body {
-    font-family: "Segoe UI", sans-serif;
-    background: #ffeef4;
-    margin: 2rem;
-  }
-  textarea {
-    width: 100%;
-    height: 150px;
-    font-family: monospace;
-    padding: 10px;
-    border: 2px solid #ffbad2;
-    border-radius: 8px;
-    background: #fff0f6;
-    color: #333;
-  }
-  input[type="text"] {
-    padding: 5px 8px;
-    border-radius: 6px;
-    border: 1px solid #ffbad2;
-    width: 200px;
-    margin-right: 10px;
-  }
-  button {
-    margin-top: 10px;
-    margin-right: 10px;
-    padding: 8px 12px;
-    border: none;
-    border-radius: 8px;
-    background: #ff85c0;
-    color: white;
-    cursor: pointer;
-  }
-  button:hover { background: #ff4fa3; }
-  #schema {
-    margin-top: 20px;
-    background: white;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 4px 12px rgba(255, 150, 200, 0.3);
-    overflow-x: auto;
-  }
-
-  /* blocchi */
-  .title {
-    text-align: center;
-    font-size: 1.8em;
-    font-weight: bold;
-    color: #ff4fa3;
-    margin-bottom: 1em;
-  }
-  .section {
-    border-left: 4px solid #ff85c0;
-    padding-left: 12px;
-    margin-bottom: 1em;
-  }
-  .section > .header-name {
-    font-weight: bold;
-    font-size: 1.2em;
-    color: #d63384;
-    margin-bottom: 0.5em;
-  }
-  .paragraph {
-    background: #ffe0f0;
-    padding: 8px 12px;
-    border-radius: 8px;
-    margin-left: 20px;
-    margin-bottom: 0.5em;
-    white-space: pre-wrap; /* mantiene a capo e spazi */
-  }
+  body { font-family: "Segoe UI", sans-serif; background: #ffe6f0; margin: 2rem; }
+  textarea { width: 100%; height: 150px; font-family: monospace; padding: 10px; border-radius: 8px; border: 1px solid #d63384; background: #fff0f5; }
+  input[type=file] { margin-top: 10px; margin-bottom: 10px; }
+  button { margin-top: 10px; margin-right: 10px; padding: 8px 12px; border: none; border-radius: 8px; background: #e83e8c; color: white; cursor: pointer; font-weight: bold; }
+  button:hover { background: #c2185b; }
+  #schema { margin-top: 20px; background: #fff0f5; border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow-x: auto; }
+  .title { text-align: center; font-size: 1.8em; font-weight: bold; color: #d63384; margin-bottom: 1em; }
+  .section { border-left: 4px solid #d63384; padding-left: 12px; margin-bottom: 1em; background: #fff0f5; border-radius: 8px; padding: 10px 15px; }
+  .section > .header-name { font-weight: bold; font-size: 1.2em; color: #d63384; margin-bottom: 0.5em; }
+  .paragraph { background: #fff; padding: 8px 10px; border-radius: 6px; border: 1px solid #ffc0d6; margin-left: 20px; margin-bottom: 0.5em; box-shadow: 1px 1px 3px rgba(214,51,132,0.2); }
+  .section img { max-width: 200px; margin: 5px 0 5px 20px; border-radius: 8px; border: 1px solid #ffc0d6; background: #fff0f5; }
+  #imagePreview { display:flex; flex-wrap:wrap; margin-top:10px; }
+  #imagePreview div { position:relative; margin-right:10px; margin-bottom:10px; }
+  #imagePreview img { max-width:80px; border-radius:6px; border:1px solid #ffc0d6; }
+  #imagePreview span { position:absolute; top:-5px; left:-5px; background:#d63384; color:white; font-size:12px; border-radius:50%; padding:2px 6px; }
 </style>
 </head>
 <body>
 
-<h1>SchemaScript</h1>
-<textarea id="code"></textarea>
+<h1 style="color:#d63384;">SchemaScript Visual Playground</h1>
+<textarea id="code" placeholder="Scrivi qui il tuo SchemaScript..."></textarea>
+<br>
+<input type="file" id="imageUpload" multiple accept="image/*">
+<div id="imagePreview"></div>
 <br>
 <button onclick="generateSchema()">Genera Schema</button>
-<br><br>
-<label for="filename">Nome file:</label>
-<input type="text" id="filename" placeholder="schema.png" value="schema.png">
 <button onclick="downloadPNG()">Scarica PNG</button>
 
 <div id="schema"></div>
 
 <script>
+let images = [];
+
+document.getElementById('imageUpload').addEventListener('change', function(event) {
+  images = [];
+  const preview = document.getElementById('imagePreview');
+  preview.innerHTML = '';
+  const files = event.target.files;
+  for (let i = 0; i < files.length; i++) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      images.push(e.target.result);
+      // mostra anteprima con numero
+      const div = document.createElement('div');
+      const img = document.createElement('img');
+      img.src = e.target.result;
+      const span = document.createElement('span');
+      span.textContent = images.length; // numero progressivo
+      div.appendChild(img);
+      div.appendChild(span);
+      preview.appendChild(div);
+    };
+    reader.readAsDataURL(files[i]);
+  }
+});
+
 function parseSchemaScript(code) {
   const lines = code.split(/\r?\n/).map(l => l.replace(/\r$/, ""));
-  const tokens = ["TITOLO", "SEZIONE", "RAMO", "CON", "PARAGRAFO"];
-
+  const tokens = ["TITOLO", "SEZIONE", "RAMO", "CON", "PARAGRAFO", "IMMAGINE"];
   let i = 0;
   const result = { title: "", sections: [] };
   const nodesByName = {};
@@ -103,77 +73,22 @@ function parseSchemaScript(code) {
     const line = raw.trim();
     if (!line) { i++; continue; }
 
-    // --- TITOLO ---
-    if (line.startsWith(tokens[0])) {
-      result.title = line.slice(tokens[0].length).trim();
-    }
-
-    // --- SEZIONE ---
-    else if (line.startsWith(tokens[1])) {
-      const val = line.slice(tokens[1].length).trim();
-      const node = { name: val, children: [] };
-      result.sections.push(node);
-      nodesByName[val] = node;
-    }
-
-    // --- RAMO <target> CON X ---
+    if (line.startsWith(tokens[0])) { result.title = line.slice(tokens[0].length).trim(); }
+    else if (line.startsWith(tokens[1])) { const val = line.slice(tokens[1].length).trim(); const node={name:val,children:[]}; result.sections.push(node); nodesByName[val]=node; }
     else if (line.startsWith(tokens[2])) {
-      const parts = line.split(/\s+/);
-      if (parts.length >= 4 && parts[2] === tokens[3]) {
-        const targetName = parts[1];
-        const afterWith = parts.slice(3).join(" ").trim();
+      const parts=line.split(/\s+/);
+      if(parts.length>=4 && parts[2]===tokens[3]){
+        const targetName=parts[1]; const afterCon=parts.slice(3).join(" ").trim();
+        const parentNode=nodesByName[targetName]||( ()=>{const n={name:targetName,children:[]};result.sections.push(n);nodesByName[targetName]=n;return n;} )();
 
-        const parentNode = nodesByName[targetName] || (() => {
-          const n = { name: targetName, children: [] };
-          result.sections.push(n);
-          nodesByName[targetName] = n;
-          return n;
-        })();
-
-        // --- CON PARAGRAFO multilinea ---
-        if (afterWith.startsWith(tokens[4])) {
-          let j = i + 1;
-          let paragraphLines = [];
-          while (j < lines.length) {
-            const l = lines[j].trim();
-            if (!l || tokens.some(t => l.startsWith(t))) break;
-            paragraphLines.push(lines[j]);
-            j++;
-          }
-          if (paragraphLines.length) {
-            parentNode.children.push({ type: "paragraph", text: paragraphLines.join("\n") });
-            i = j - 1;
-          }
-        }
-
-        // --- CON SEZIONE ---
-        else if (afterWith.startsWith(tokens[1])) {
-          let headerVal = afterWith.slice(tokens[1].length).trim();
-          if (!headerVal && i + 1 < lines.length) {
-            headerVal = lines[i + 1].trim();
-            i++;
-          }
-          if (headerVal) {
-            const newNode = { name: headerVal, children: [] };
-            parentNode.children.push(newNode);
-            nodesByName[headerVal] = newNode;
-          }
-        }
-
-        else if (afterWith) {
-          parentNode.children.push({ type: "paragraph", text: "(" + afterWith + ")" });
-        }
+        if(afterCon.startsWith(tokens[4])){ let j=i+1; while(j<lines.length&&lines[j].trim()==="") j++; if(j<lines.length){parentNode.children.push({type:"paragraph",text:lines[j].trim()}); i=j;} }
+        else if(afterCon.startsWith(tokens[1])){ let headerVal=afterCon.slice(tokens[1].length).trim(); if(!headerVal&&i+1<lines.length){headerVal=lines[i+1].trim(); i++;} if(headerVal){const n={name:headerVal,children:[]};parentNode.children.push(n);nodesByName[headerVal]=n;} }
+        else if(afterCon.startsWith(tokens[5])){ const num=parseInt(afterCon.slice(tokens[5].length).trim()); if(!isNaN(num)&&images[num-1]) parentNode.children.push({type:"image",src:images[num-1]}); }
+        else if(afterCon){ parentNode.children.push({type:"paragraph",text:"("+afterCon+")"}); }
       }
     }
-
-    // --- fallback ---
-    else {
-      const lastSection = result.sections[result.sections.length - 1];
-      if (lastSection) {
-        lastSection.children.push({ type: "paragraph", text: line });
-      }
-    }
-
+    else if(line.startsWith(tokens[5])){ const num=parseInt(line.slice(tokens[5].length).trim()); if(!isNaN(num)&&images[num-1]){ const lastSection=result.sections[result.sections.length-1]; if(lastSection) lastSection.children.push({type:"image",src:images[num-1]}); } }
+    else { const lastSection=result.sections[result.sections.length-1]; if(lastSection) lastSection.children.push({type:"paragraph",text:line}); }
     i++;
   }
 
@@ -181,55 +96,30 @@ function parseSchemaScript(code) {
 }
 
 function renderSection(section, container) {
-  const div = document.createElement("div");
-  div.className = "section";
+  const div=document.createElement("div"); div.className="section";
+  const header=document.createElement("div"); header.className="header-name"; header.textContent=section.name; div.appendChild(header);
 
-  const header = document.createElement("div");
-  header.className = "header-name";
-  header.textContent = section.name;
-  div.appendChild(header);
-
-  section.children.forEach(child => {
-    if (child.type === "paragraph") {
-      const p = document.createElement("div");
-      p.className = "paragraph";
-      p.textContent = child.text;
-      div.appendChild(p);
-    } else if (child.name) {
-      renderSection(child, div);
-    }
+  section.children.forEach(child=>{
+    if(child.type==="paragraph"){ const p=document.createElement("div"); p.className="paragraph"; p.textContent=child.text; div.appendChild(p); }
+    else if(child.type==="image"){ const img=document.createElement("img"); img.src=child.src; div.appendChild(img); }
+    else if(child.name) renderSection(child,div);
   });
 
   container.appendChild(div);
 }
 
 function generateSchema() {
-  const code = document.getElementById("code").value;
-  const parsed = parseSchemaScript(code);
-  const container = document.getElementById("schema");
-  container.innerHTML = "";
-
-  if (parsed.title) {
-    const titleDiv = document.createElement("div");
-    titleDiv.className = "title";
-    titleDiv.textContent = parsed.title;
-    container.appendChild(titleDiv);
-  }
-
-  parsed.sections.forEach(sec => renderSection(sec, container));
+  const code=document.getElementById("code").value;
+  const parsed=parseSchemaScript(code);
+  const container=document.getElementById("schema");
+  container.innerHTML="";
+  if(parsed.title){ const t=document.createElement("div"); t.className="title"; t.textContent=parsed.title; container.appendChild(t);}
+  parsed.sections.forEach(sec=>renderSection(sec,container));
 }
 
 function downloadPNG() {
-  const container = document.getElementById("schema");
-  const filenameInput = document.getElementById("filename");
-  const filename = filenameInput.value.trim() || "schema.png";
-
-  html2canvas(container).then(canvas => {
-    const link = document.createElement("a");
-    link.download = filename.endsWith(".png") ? filename : filename + ".png";
-    link.href = canvas.toDataURL();
-    link.click();
-  });
+  const container=document.getElementById("schema");
+  html2canvas(container).then(canvas=>{ const link=document.createElement("a"); link.download="schema.png"; link.href=canvas.toDataURL(); link.click(); });
 }
 </script>
 
