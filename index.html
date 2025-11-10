@@ -64,6 +64,7 @@ document.getElementById('imageUpload').addEventListener('change', function(event
 function parseSchemaScript(code) {
   const lines = code.split(/\r?\n/).map(l => l.replace(/\r$/, ""));
   const tokens = ["TITOLO", "SEZIONE", "RAMO", "CON", "PARAGRAFO", "IMMAGINE"];
+
   let i = 0;
   const result = { title: "", sections: [] };
   const nodesByName = {};
@@ -73,22 +74,97 @@ function parseSchemaScript(code) {
     const line = raw.trim();
     if (!line) { i++; continue; }
 
-    if (line.startsWith(tokens[0])) { result.title = line.slice(tokens[0].length).trim(); }
-    else if (line.startsWith(tokens[1])) { const val = line.slice(tokens[1].length).trim(); const node={name:val,children:[]}; result.sections.push(node); nodesByName[val]=node; }
-    else if (line.startsWith(tokens[2])) {
-      const parts=line.split(/\s+/);
-      if(parts.length>=4 && parts[2]===tokens[3]){
-        const targetName=parts[1]; const afterCon=parts.slice(3).join(" ").trim();
-        const parentNode=nodesByName[targetName]||( ()=>{const n={name:targetName,children:[]};result.sections.push(n);nodesByName[targetName]=n;return n;} )();
-
-        if(afterCon.startsWith(tokens[4])){ let j=i+1; while(j<lines.length&&lines[j].trim()==="") j++; if(j<lines.length){parentNode.children.push({type:"paragraph",text:lines[j].trim()}); i=j;} }
-        else if(afterCon.startsWith(tokens[1])){ let headerVal=afterCon.slice(tokens[1].length).trim(); if(!headerVal&&i+1<lines.length){headerVal=lines[i+1].trim(); i++;} if(headerVal){const n={name:headerVal,children:[]};parentNode.children.push(n);nodesByName[headerVal]=n;} }
-        else if(afterCon.startsWith(tokens[5])){ const num=parseInt(afterCon.slice(tokens[5].length).trim()); if(!isNaN(num)&&images[num-1]) parentNode.children.push({type:"image",src:images[num-1]}); }
-        else if(afterCon){ parentNode.children.push({type:"paragraph",text:"("+afterCon+")"}); }
-      }
+    // TITOLO
+    if (line.startsWith(tokens[0])) {
+      result.title = line.slice(tokens[0].length).trim();
+      i++;
+      continue;
     }
-    else if(line.startsWith(tokens[5])){ const num=parseInt(line.slice(tokens[5].length).trim()); if(!isNaN(num)&&images[num-1]){ const lastSection=result.sections[result.sections.length-1]; if(lastSection) lastSection.children.push({type:"image",src:images[num-1]}); } }
-    else { const lastSection=result.sections[result.sections.length-1]; if(lastSection) lastSection.children.push({type:"paragraph",text:line}); }
+
+    // SEZIONE
+    if (line.startsWith(tokens[1])) {
+      const val = line.slice(tokens[1].length).trim();
+      const node = { name: val, children: [] };
+      result.sections.push(node);
+      nodesByName[val] = node;
+      i++;
+      continue;
+    }
+
+    // RAMO <target> CON ...
+    if (line.startsWith(tokens[2])) {
+      // Prendi il testo dopo "RAMO" e separa target e dopo "CON"
+      const afterRamo = line.slice(tokens[2].length).trim(); // testo dopo "RAMO "
+      const conIndex = afterRamo.indexOf(tokens[3]); // posizione della parola "CON" (se presente)
+
+      if (conIndex >= 0) {
+        const targetName = afterRamo.slice(0, conIndex).trim(); // tutto fra RAMO e CON (può avere spazi)
+        const afterCon = afterRamo.slice(conIndex + tokens[3].length).trim(); // testo dopo "CON"
+
+        // trova (o crea) il nodo target
+        const parentNode = nodesByName[targetName] || (() => {
+          const n = { name: targetName, children: [] };
+          result.sections.push(n);
+          nodesByName[targetName] = n;
+          return n;
+        })();
+
+        // CON PARAGRAFO: prendi la prossima riga non vuota
+        if (afterCon.startsWith(tokens[4])) {
+          let j = i + 1;
+          while (j < lines.length && lines[j].trim() === "") j++;
+          if (j < lines.length) {
+            parentNode.children.push({ type: "paragraph", text: lines[j].trim() });
+            i = j; // salta la riga del paragrafo
+          }
+        }
+
+        // CON SEZIONE: headerVal può essere sulla stessa riga o sulla successiva
+        else if (afterCon.startsWith(tokens[1])) {
+          let headerVal = afterCon.slice(tokens[1].length).trim();
+          if (!headerVal && i + 1 < lines.length) {
+            headerVal = lines[i + 1].trim();
+            i++; // consumiamo la riga successiva come nome
+          }
+          if (headerVal) {
+            const newNode = { name: headerVal, children: [] };
+            parentNode.children.push(newNode);
+            nodesByName[headerVal] = newNode;
+          }
+        }
+
+        // CON IMMAGINE n
+        else if (afterCon.startsWith(tokens[5])) {
+          const num = parseInt(afterCon.slice(tokens[5].length).trim());
+          if (!isNaN(num) && images && images[num - 1]) {
+            parentNode.children.push({ type: "image", src: images[num - 1] });
+          }
+        }
+
+        // fallback: testo generico dopo CON
+        else if (afterCon) {
+          parentNode.children.push({ type: "paragraph", text: "(" + afterCon + ")" });
+        }
+      }
+
+      i++;
+      continue;
+    }
+
+    // IMMAGINE fuori da ramo (IMMAGINE n su riga propria)
+    if (line.startsWith(tokens[5])) {
+      const num = parseInt(line.slice(tokens[5].length).trim());
+      if (!isNaN(num) && images && images[num - 1]) {
+        const lastSection = result.sections[result.sections.length - 1];
+        if (lastSection) lastSection.children.push({ type: "image", src: images[num - 1] });
+      }
+      i++;
+      continue;
+    }
+
+    // fallback: testo libero -> ultima sezione principale
+    const lastSection = result.sections[result.sections.length - 1];
+    if (lastSection) lastSection.children.push({ type: "paragraph", text: line });
     i++;
   }
 
