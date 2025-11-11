@@ -163,6 +163,33 @@
     padding: 2px 6px;
   }
 
+  /* Liste stilizzate */
+  ol {
+    counter-reset: item;
+    margin: 10px 0;
+    padding: 0;
+    list-style: none;
+  }
+  
+  ol li {
+    counter-increment: item;
+    background: #fff; /* stesso sfondo dei paragrafi */
+    border: 1px solid #ffc0d6; /* bordo rosa chiaro */
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    box-shadow: 1px 1px 3px rgba(214,51,132,0.15);
+    position: relative;
+    line-height: 1.4em;
+  }
+  
+  ol li::before {
+    content: counter(item) ". ";
+    font-weight: bold;
+    color: #d63384; /* rosa scuro per il numero */
+    margin-right: 6px;
+  }
+
   /* Miglior layout su dispositivi piccoli */
   @media (max-width: 600px) {
     h1 { font-size: 1.7rem; }
@@ -170,6 +197,8 @@
     button { font-size: 0.9rem; padding: 8px 10px; }
     .section { padding: 8px 10px; }
     .paragraph { margin-left: 10px; font-size: 0.9rem; }
+    ol { padding: 8px 15px; }
+    ol li { font-size: 0.9rem; padding: 4px 6px; }
   }
 </style>
 </head>
@@ -223,14 +252,14 @@ function normalizeKey(s) {
 
 function isTokenLine(trimmed) {
   if (!trimmed) return false;
-  const tokens = ["TITOLO", "SEZIONE", "RAMO", "CON", "PARAGRAFO", "IMMAGINE"];
+  const tokens = ["TITOLO", "SEZIONE", "RAMO", "CON", "PARAGRAFO", "IMMAGINE", "LISTA"];
   for (const t of tokens) if (trimmed.startsWith(t)) return true;
   return false;
 }
 
 function parseSchemaScript(code) {
   const rawLines = code.split(/\r?\n/).map(l => l.replace(/\r$/, ""));
-  const tokens = ["TITOLO", "SEZIONE", "RAMO", "CON", "PARAGRAFO", "IMMAGINE"];
+  const tokens = ["TITOLO", "SEZIONE", "RAMO", "CON", "PARAGRAFO", "IMMAGINE", "LISTA"];
 
   let i = 0;
   const result = { title: "", sections: [] };
@@ -290,6 +319,21 @@ function parseSchemaScript(code) {
           }
           if (collected.length > 0) {
             parentNode.children.push({ type: "paragraph", text: collected.join("\n") });
+            i = Math.max(i, j - 1);
+          }
+        } else if (afterCon.startsWith(tokens[6])) {
+          // LISTA
+          let j = i + 1;
+          const items = [];
+          while (j < rawLines.length) {
+            const nextTrim = rawLines[j].trim();
+            if (nextTrim === "") { j++; continue; }
+            if (isTokenLine(nextTrim)) break;
+            items.push(nextTrim);
+            j++;
+          }
+          if (items.length > 0) {
+            parentNode.children.push({ type: "list", items });
             i = Math.max(i, j - 1);
           }
         }
@@ -354,6 +398,15 @@ function renderSection(section, container) {
       const img = document.createElement("img");
       img.src = child.src;
       div.appendChild(img);
+    } else if (child.type === "list") {
+      const ol = document.createElement("ol");
+      ol.style.marginLeft = "20px";
+      child.items.forEach(item => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        ol.appendChild(li);
+      });
+      div.appendChild(ol);
     } else if (child.name !== undefined) {
       renderSection(child, div);
     }
