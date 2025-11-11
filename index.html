@@ -17,26 +17,28 @@
     font-family: "Segoe UI", "Helvetica Neue", sans-serif;
     background: var(--rosa-chiaro);
     margin: 0;
-    padding: 1.5rem;
+    padding: 1rem;
     display: flex;
     flex-direction: column;
     align-items: center;
+    min-height: 100vh;
+    box-sizing: border-box;
   }
 
   h1 {
     color: var(--rosa-accento);
     font-size: 2rem;
     font-weight: 700;
-    margin-bottom: 1.5rem;
+    margin: 0 0 1.2rem;
     text-align: center;
   }
 
   textarea {
     width: 100%;
-    max-width: 600px;
+    max-width: 700px;
     height: 160px;
     font-family: monospace;
-    font-size: 0.95rem;
+    font-size: 1rem;
     padding: 12px;
     border-radius: 10px;
     border: 1px solid var(--rosa-accento);
@@ -49,45 +51,53 @@
   input[type=file] {
     margin-top: 10px;
     margin-bottom: 5px;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
+  }
+
+  #controls {
+    position: sticky;
+    top: 0;
+    background: var(--rosa-chiaro);
+    padding: 0.6rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.6rem;
+    width: 100%;
+    max-width: 700px;
+    z-index: 10;
   }
 
   button {
-    margin-top: 10px;
-    margin-right: 10px;
-    padding: 10px 14px;
+    padding: 10px 16px;
     border: none;
     border-radius: 10px;
     background: var(--rosa-bottone);
     color: white;
     font-weight: bold;
-    font-size: 0.95rem;
+    font-size: 1rem;
     cursor: pointer;
-    transition: background 0.25s;
+    transition: background 0.25s, transform 0.1s;
   }
 
   button:hover {
     background: var(--rosa-bottone-hover);
   }
 
-  #controls {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.5rem;
-    width: 100%;
-    max-width: 600px;
-    margin-bottom: 1rem;
+  button:active {
+    transform: scale(0.97);
   }
 
   #schema {
     margin-top: 20px;
     background: var(--rosa-medio);
     border-radius: 16px;
-    padding: 20px;
+    padding: 16px;
     box-shadow: 0 4px 14px rgba(0,0,0,0.1);
-    overflow-x: auto;
-    max-width: 95%;
+    width: 100%;
+    max-width: 700px;
+    box-sizing: border-box;
+    overflow-x: hidden;
   }
 
   .title {
@@ -96,6 +106,7 @@
     font-weight: bold;
     color: var(--rosa-accento);
     margin-bottom: 1em;
+    word-break: break-word;
   }
 
   .section {
@@ -105,6 +116,7 @@
     background: var(--rosa-medio);
     border-radius: 12px;
     padding: 10px 15px;
+    word-break: break-word;
   }
 
   .section > .header-name {
@@ -127,17 +139,19 @@
   }
 
   .section img {
-    max-width: 200px;
-    margin: 5px 0 5px 15px;
+    max-width: 100%;
+    height: auto;
+    margin: 8px 0 8px 15px;
     border-radius: 8px;
     border: 1px solid #ffc0d6;
     background: #fff0f5;
+    display: block;
   }
 
   #imagePreview {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 10px;
     justify-content: center;
     margin-top: 10px;
   }
@@ -147,8 +161,8 @@
   }
 
   #imagePreview img {
-    max-width: 70px;
-    border-radius: 6px;
+    max-width: 80px;
+    border-radius: 8px;
     border: 1px solid #ffc0d6;
   }
 
@@ -173,32 +187,54 @@
   
   ol li {
     counter-increment: item;
-    background: #fff; /* stesso sfondo dei paragrafi */
-    border: 1px solid #ffc0d6; /* bordo rosa chiaro */
+    background: #fff;
+    border: 1px solid #ffc0d6;
     border-radius: 8px;
     padding: 8px 12px;
     margin-bottom: 6px;
     box-shadow: 1px 1px 3px rgba(214,51,132,0.15);
-    position: relative;
     line-height: 1.4em;
   }
   
   ol li::before {
     content: counter(item) ". ";
     font-weight: bold;
-    color: #d63384; /* rosa scuro per il numero */
+    color: #d63384;
     margin-right: 6px;
   }
 
   /* Miglior layout su dispositivi piccoli */
   @media (max-width: 600px) {
-    h1 { font-size: 1.7rem; }
-    textarea { font-size: 0.9rem; }
-    button { font-size: 0.9rem; padding: 8px 10px; }
-    .section { padding: 8px 10px; }
-    .paragraph { margin-left: 10px; font-size: 0.9rem; }
-    ol { padding: 8px 15px; }
-    ol li { font-size: 0.9rem; padding: 4px 6px; }
+    body {
+      padding: 0.8rem;
+    }
+    h1 {
+      font-size: 1.6rem;
+      margin-bottom: 1rem;
+    }
+    textarea {
+      font-size: 0.9rem;
+      height: 140px;
+    }
+    button {
+      flex: 1 1 45%;
+      font-size: 0.9rem;
+      padding: 9px 12px;
+    }
+    .section {
+      padding: 8px 10px;
+    }
+    .paragraph {
+      margin-left: 10px;
+      font-size: 0.9rem;
+    }
+    ol li {
+      font-size: 0.9rem;
+      padding: 6px 8px;
+    }
+    #imagePreview img {
+      max-width: 65px;
+    }
   }
 </style>
 </head>
