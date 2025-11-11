@@ -14,7 +14,7 @@
   .title { text-align: center; font-size: 1.8em; font-weight: bold; color: #d63384; margin-bottom: 1em; }
   .section { border-left: 4px solid #d63384; padding-left: 12px; margin-bottom: 1em; background: #fff0f5; border-radius: 8px; padding: 10px 15px; }
   .section > .header-name { font-weight: bold; font-size: 1.2em; color: #d63384; margin-bottom: 0.5em; }
-  .paragraph { background: #fff; padding: 8px 10px; border-radius: 6px; border: 1px solid #ffc0d6; margin-left: 20px; margin-bottom: 0.5em; box-shadow: 1px 1px 3px rgba(214,51,132,0.2); }
+  .paragraph { background: #fff; padding: 8px 10px; border-radius: 6px; border: 1px solid #ffc0d6; margin-left: 20px; margin-bottom: 0.5em; box-shadow: 1px 1px 3px rgba(214,51,132,0.2); white-space: pre-wrap; }
   .section img { max-width: 200px; margin: 5px 0 5px 20px; border-radius: 8px; border: 1px solid #ffc0d6; background: #fff0f5; }
   #imagePreview { display:flex; flex-wrap:wrap; margin-top:10px; }
   #imagePreview div { position:relative; margin-right:10px; margin-bottom:10px; }
@@ -38,131 +38,143 @@
 <script>
 let images = [];
 
+// Anteprima immagini
 document.getElementById('imageUpload').addEventListener('change', function(event) {
   images = [];
   const preview = document.getElementById('imagePreview');
   preview.innerHTML = '';
-  const files = event.target.files;
-  for (let i = 0; i < files.length; i++) {
+  const files = Array.from(event.target.files);
+  files.forEach((file) => {
     const reader = new FileReader();
     reader.onload = function(e) {
       images.push(e.target.result);
-      // mostra anteprima con numero
       const div = document.createElement('div');
       const img = document.createElement('img');
       img.src = e.target.result;
       const span = document.createElement('span');
-      span.textContent = images.length; // numero progressivo
+      span.textContent = images.length;
       div.appendChild(img);
       div.appendChild(span);
       preview.appendChild(div);
     };
-    reader.readAsDataURL(files[i]);
-  }
+    reader.readAsDataURL(file);
+  });
 });
 
+function normalizeKey(s) {
+  if (s === "_") return "_";
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\u2018\u2019\u201C\u201D]/g, "")
+    .replace(/[^\w\s]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function isTokenLine(trimmed) {
+  if (!trimmed) return false;
+  const tokens = ["TITOLO", "SEZIONE", "RAMO", "CON", "PARAGRAFO", "IMMAGINE"];
+  for (const t of tokens) if (trimmed.startsWith(t)) return true;
+  return false;
+}
+
 function parseSchemaScript(code) {
-  const lines = code.split(/\r?\n/).map(l => l.replace(/\r$/, ""));
+  const rawLines = code.split(/\r?\n/).map(l => l.replace(/\r$/, ""));
   const tokens = ["TITOLO", "SEZIONE", "RAMO", "CON", "PARAGRAFO", "IMMAGINE"];
 
   let i = 0;
   const result = { title: "", sections: [] };
-  const nodesByName = {};
+  const nodesByKey = {};
 
-  while (i < lines.length) {
-    const raw = lines[i];
+  const registerNode = (keyRaw, node) => {
+    const keyNorm = normalizeKey(keyRaw);
+    nodesByKey[keyNorm] = node;
+    nodesByKey[keyRaw] = node;
+  };
+
+  while (i < rawLines.length) {
+    const raw = rawLines[i];
     const line = raw.trim();
     if (!line) { i++; continue; }
 
-    // TITOLO
     if (line.startsWith(tokens[0])) {
       result.title = line.slice(tokens[0].length).trim();
-      i++;
-      continue;
+      i++; continue;
     }
 
-    // SEZIONE
     if (line.startsWith(tokens[1])) {
-      const val = line.slice(tokens[1].length).trim();
-      const node = { name: val, children: [] };
+      const valRaw = line.slice(tokens[1].length).trim();
+      const display = (valRaw === "_") ? "" : valRaw;
+      const node = { name: display, children: [] };
       result.sections.push(node);
-      nodesByName[val] = node;
-      i++;
-      continue;
+      registerNode(valRaw, node);
+      i++; continue;
     }
 
-    // RAMO <target> CON ...
     if (line.startsWith(tokens[2])) {
-      // Prendi il testo dopo "RAMO" e separa target e dopo "CON"
-      const afterRamo = line.slice(tokens[2].length).trim(); // testo dopo "RAMO "
-      const conIndex = afterRamo.indexOf(tokens[3]); // posizione della parola "CON" (se presente)
+      const afterRamo = line.slice(tokens[2].length).trim();
+      const conMatch = afterRamo.match(/\bCON\b/);
+      if (conMatch) {
+        const conIndex = conMatch.index;
+        const targetRaw = afterRamo.slice(0, conIndex).trim();
+        const afterCon = afterRamo.slice(conIndex + 3).trim();
 
-      if (conIndex >= 0) {
-        const targetName = afterRamo.slice(0, conIndex).trim(); // tutto fra RAMO e CON (può avere spazi)
-        const afterCon = afterRamo.slice(conIndex + tokens[3].length).trim(); // testo dopo "CON"
-
-        // trova (o crea) il nodo target
-        const parentNode = nodesByName[targetName] || (() => {
-          const n = { name: targetName, children: [] };
+        const keyNorm = normalizeKey(targetRaw);
+        const parentNode = nodesByKey[keyNorm] || nodesByKey[targetRaw] || (() => {
+          const display = (targetRaw === "_") ? "" : targetRaw;
+          const n = { name: display, children: [] };
           result.sections.push(n);
-          nodesByName[targetName] = n;
+          registerNode(targetRaw, n);
           return n;
         })();
 
-        // CON PARAGRAFO: prendi la prossima riga non vuota
         if (afterCon.startsWith(tokens[4])) {
           let j = i + 1;
-          while (j < lines.length && lines[j].trim() === "") j++;
-          if (j < lines.length) {
-            parentNode.children.push({ type: "paragraph", text: lines[j].trim() });
-            i = j; // salta la riga del paragrafo
+          const collected = [];
+          while (j < rawLines.length) {
+            const nextTrim = rawLines[j].trim();
+            if (nextTrim === "") { collected.push(""); j++; continue; }
+            if (isTokenLine(nextTrim)) break;
+            collected.push(nextTrim);
+            j++;
+          }
+          if (collected.length > 0) {
+            parentNode.children.push({ type: "paragraph", text: collected.join("\n") });
+            i = Math.max(i, j - 1);
           }
         }
-
-        // CON SEZIONE: headerVal può essere sulla stessa riga o sulla successiva
         else if (afterCon.startsWith(tokens[1])) {
-          let headerVal = afterCon.slice(tokens[1].length).trim();
-          if (!headerVal && i + 1 < lines.length) {
-            headerVal = lines[i + 1].trim();
-            i++; // consumiamo la riga successiva come nome
+          let headerValRaw = afterCon.slice(tokens[1].length).trim();
+          if (!headerValRaw && i + 1 < rawLines.length) {
+            const next = rawLines[i + 1].trim();
+            if (next !== "") { headerValRaw = next; i++; }
           }
-          if (headerVal) {
-            const newNode = { name: headerVal, children: [] };
+          if (headerValRaw !== undefined) {
+            const display = (headerValRaw === "_") ? "" : headerValRaw;
+            const newNode = { name: display, children: [] };
             parentNode.children.push(newNode);
-            nodesByName[headerVal] = newNode;
+            registerNode(headerValRaw, newNode);
           }
         }
-
-        // CON IMMAGINE n
         else if (afterCon.startsWith(tokens[5])) {
           const num = parseInt(afterCon.slice(tokens[5].length).trim());
-          if (!isNaN(num) && images && images[num - 1]) {
-            parentNode.children.push({ type: "image", src: images[num - 1] });
-          }
+          if (!isNaN(num) && images[num - 1]) parentNode.children.push({ type: "image", src: images[num - 1] });
         }
-
-        // fallback: testo generico dopo CON
         else if (afterCon) {
           parentNode.children.push({ type: "paragraph", text: "(" + afterCon + ")" });
         }
       }
-
-      i++;
-      continue;
+      i++; continue;
     }
 
-    // IMMAGINE fuori da ramo (IMMAGINE n su riga propria)
     if (line.startsWith(tokens[5])) {
       const num = parseInt(line.slice(tokens[5].length).trim());
-      if (!isNaN(num) && images && images[num - 1]) {
+      if (!isNaN(num) && images[num - 1]) {
         const lastSection = result.sections[result.sections.length - 1];
         if (lastSection) lastSection.children.push({ type: "image", src: images[num - 1] });
       }
-      i++;
-      continue;
+      i++; continue;
     }
 
-    // fallback: testo libero -> ultima sezione principale
     const lastSection = result.sections[result.sections.length - 1];
     if (lastSection) lastSection.children.push({ type: "paragraph", text: line });
     i++;
@@ -172,30 +184,57 @@ function parseSchemaScript(code) {
 }
 
 function renderSection(section, container) {
-  const div=document.createElement("div"); div.className="section";
-  const header=document.createElement("div"); header.className="header-name"; header.textContent=section.name; div.appendChild(header);
+  const div = document.createElement("div");
+  div.className = "section";
+  if (section.name && section.name.trim() !== "") {
+    const header = document.createElement("div");
+    header.className = "header-name";
+    header.textContent = section.name;
+    div.appendChild(header);
+  }
 
-  section.children.forEach(child=>{
-    if(child.type==="paragraph"){ const p=document.createElement("div"); p.className="paragraph"; p.textContent=child.text; div.appendChild(p); }
-    else if(child.type==="image"){ const img=document.createElement("img"); img.src=child.src; div.appendChild(img); }
-    else if(child.name) renderSection(child,div);
+  section.children.forEach(child => {
+    if (child.type === "paragraph") {
+      const p = document.createElement("div");
+      p.className = "paragraph";
+      p.textContent = child.text;
+      div.appendChild(p);
+    } else if (child.type === "image") {
+      const img = document.createElement("img");
+      img.src = child.src;
+      div.appendChild(img);
+    } else if (child.name !== undefined) {
+      renderSection(child, div);
+    }
   });
 
   container.appendChild(div);
 }
 
 function generateSchema() {
-  const code=document.getElementById("code").value;
-  const parsed=parseSchemaScript(code);
-  const container=document.getElementById("schema");
-  container.innerHTML="";
-  if(parsed.title){ const t=document.createElement("div"); t.className="title"; t.textContent=parsed.title; container.appendChild(t);}
-  parsed.sections.forEach(sec=>renderSection(sec,container));
+  const code = document.getElementById("code").value;
+  const parsed = parseSchemaScript(code);
+  const container = document.getElementById("schema");
+  container.innerHTML = "";
+  if (parsed.title) {
+    const t = document.createElement("div");
+    t.className = "title";
+    t.textContent = parsed.title;
+    container.appendChild(t);
+  }
+  parsed.sections.forEach(sec => renderSection(sec, container));
 }
 
 function downloadPNG() {
-  const container=document.getElementById("schema");
-  html2canvas(container).then(canvas=>{ const link=document.createElement("a"); link.download="schema.png"; link.href=canvas.toDataURL(); link.click(); });
+  const container = document.getElementById("schema");
+  html2canvas(container).then(canvas => {
+    const link = document.createElement("a");
+    let filename = prompt("Inserisci il nome del file (senza estensione):", "schema");
+    if (!filename) filename = "schema";
+    link.download = `${filename}.png`;
+    link.href = canvas.toDataURL();
+    link.click();
+  });
 }
 </script>
 
